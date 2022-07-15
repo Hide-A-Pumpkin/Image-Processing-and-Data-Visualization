@@ -1,0 +1,862 @@
+<html>
+<head>
+<style>
+/* HTML styles */
+html{ width: 100%; }
+body{ 
+  width: 100%; 
+  margin: 0; padding: 0; 
+  display: flex; 
+  font-family: sans-serif; font-size: 75%; }
+h1 {
+    line-height: 0.5;
+    color: #000;
+    margin-right: .5em;
+    font-size: 120%;
+    font-weight: bold;
+  }
+.mainGraph {
+    background-color: rgb(255, 255, 255);
+    border-radius: 3px;
+		/* border: 1px solid #ccc; */
+}
+.mainGraph .title {
+  padding-left: 5px;
+  box-shadow: #aaa 0px 2px 3px;
+  margin-top: -5px;
+}
+.mainGraph .title ul{
+  display: flex;
+  padding-left: 0px;
+  border-bottom: #666;
+}
+.mainGraph .title ul li{
+  list-style: none;
+  /* border: 1px solid rgb(175, 175, 175); */
+  padding: 5px;
+  margin-right: 10px;
+  color: rgb(86, 86, 86);
+  border-radius: 3px;
+}
+.mainGraph .title ul li.current{
+  border-radius: 3px;
+  position: relative;
+  /* top: 1px; */
+  font-weight: bold;
+  color: rgb(6, 6, 6);
+}
+.mainGraph .content{
+  border: 1px solid #666;
+  border-radius: 3px;
+  padding: 5px;
+  margin: 5px;
+  min-width: 1195px;
+  min-height: 550px;
+  margin-bottom: 5px;
+}
+.mainGraph .content>div{
+  display: none;
+}
+.mainGraph .content>div:first-child{
+  display: block;
+}
+.off{
+  /* border: 1px solid rgb(56, 56, 56); */
+  border-radius: 3px;
+  position: relative;
+  /* top: 1px; */
+  font-weight: bold;
+  color: rgb(6, 6, 6);
+}
+.controls {
+  flex-basis: 200px;
+  padding: 0 5px;
+}
+.controls .force {
+  background-color:#eee;
+  border-radius: 3px;
+  padding: 5px;
+  margin: 5px 0;
+}
+.controls .force p label { 
+  margin-right: .5em; 
+  font-size: 120%; 
+  font-weight: bold;
+}
+.controls .force p { 
+  margin-top: 0;
+}
+.controls .force label { 
+  display: inline-block; 
+}
+.controls input[type="checkbox"] { 
+  transform: scale(1.2, 1.2); 
+}
+.controls input[type="range"] { 
+  margin: 0 5% 0.5em 5%; 
+  width: 90%; 
+}
+/* alpha viewer */
+.controls .alpha p { 
+  margin-bottom: .25em; 
+}
+.controls .alpha .alpha_bar { 
+  height: .5em; 
+  border: 1px #777 solid; 
+  border-radius: 2px; 
+  padding: 1px; 
+  display: flex; 
+}
+.controls .alpha .alpha_bar #alpha_value { 
+  background-color: #555; 
+  border-radius: 1px; 
+  flex-basis: 100% 
+}
+.controls .alpha .alpha_bar:hover { 
+  border-width: 2px; 
+  margin:-1px; 
+}
+.controls .alpha .alpha_bar:active #alpha_value { 
+  background-color: #222 
+}
+
+/* SVG styles */
+svg {
+  flex-basis: 100%;
+  min-width: 1000px;
+  min-height: 550px;
+}
+.links line {
+  stroke: #aaa;
+}
+.nodes circle {
+  pointer-events: all;
+}
+path.hull {
+    fill: steelblue;
+    /* fill: rgb(255, 182, 46); */
+    fill-opacity: 0.3;
+    pointer-events: none;
+}
+
+</style>
+</head>
+<body>
+<div class='mainGraph' id="tab1">
+  <div class="title">
+    <ul>
+      <li class="current" id="one0" onclick="setTab('one',0)">Overview
+      </li>
+      <li id="one1" onclick="setTab('one',1)">Detail
+      </li>
+      <li id="one2" onclick="setTab('one',2)">Analysis</li>
+      <li id="one3" onclick="setTab('one',3)"></li>
+    </ul>
+  </div>
+<!-- <h1>Force Graph</h1> -->
+  <div class="content">
+    <div id="con0" style="display:flex">
+      <div class="controls">
+        <div class="force alpha">
+          <p><label> Simulation activity</label></p>
+          <div class="alpha_bar" onclick="updateAll();"><div id="alpha_value"></div></div>
+        </div>
+        <div class="force">
+          <p><label>center</label> Shifts the view</p>
+          <label>
+            x
+            <output id="center_XSliderOutput">.5</output>
+            <input type="range" min="0" max="1" value=".5" step="0.01" oninput="d3.select('#center_XSliderOutput').text(value); forceProperties.center.x=value; updateAll();">
+          </label>
+          <label>
+            y
+            <output id="center_YSliderOutput">.5</output>
+            <input type="range" min="0" max="1" value=".5" step="0.01" oninput="d3.select('#center_YSliderOutput').text(value); forceProperties.center.y=value; updateAll();">
+          </label>
+        </div>
+      
+        <div class="force">
+          <p><label><input type="checkbox" checked onchange="forceProperties.charge.enabled = this.checked; updateAll();"> charge</label> Attracts (+) or repels (-) nodes.</p>
+          <label title="Negative strength repels nodes. Positive strength attracts nodes.">
+            strength
+            <output id="charge_StrengthSliderOutput">-30</output>
+            <input type="range" min="-100" max="50" value="-30" step=".1" oninput="d3.select('#charge_StrengthSliderOutput').text(value); forceProperties.charge.strength=value; updateAll();">
+          </label>
+          <label title="Minimum distance where force is applied">
+            distanceMin
+            <output id="charge_distanceMinSliderOutput">1</output>
+            <input type="range" min="0" max="50" value="1" step=".1" oninput="d3.select('#charge_distanceMinSliderOutput').text(value); forceProperties.charge.distanceMin=value; updateAll();">
+          </label>
+          <label title="Maximum distance where force is applied">
+            distanceMax
+            <output id="charge_distanceMaxSliderOutput">100</output>
+            <input type="range" min="0" max="200" value="100" step=".1" oninput="d3.select('#charge_distanceMaxSliderOutput').text(value); forceProperties.charge.distanceMax=value; updateAll();">
+          </label>
+        </div>
+        <div class="force">
+          <p><label><input type="checkbox" checked onchange="forceProperties.link.enabled = this.checked; updateAll();"> link</label> Sets link length</p>
+          <label title="The force will push/pull nodes to make links this long">
+            distance
+            <output id="link_DistanceSliderOutput">30</output>
+            <input type="range" min="0" max="100" value="30" step="1" oninput="d3.select('#link_DistanceSliderOutput').text(value); forceProperties.link.distance=value; updateAll();">
+          </label>
+          <label title="Higher values increase rigidity of the links (WARNING: high values are computationally expensive)">
+            iterations
+            <output id="link_IterationsSliderOutput">1</output>
+            <input type="range" min="1" max="10" value="1" step="1" oninput="d3.select('#link_IterationsSliderOutput').text(value); forceProperties.link.iterations=value; updateAll();">
+          </label>
+        </div>
+      </div><svg id="force_graph"></svg>
+      <table border="0" id="'tab">
+      </table>
+    </div>
+    <div id="con1" style="display: none;">222</div>
+    <div id='con3' style="display: none;"><svg id='detail'></svg></div>
+    <div id="con2" style="display: none;"><table id="example"></table></div>
+  </div>
+</div>
+
+<!-- DataTables CSS -->
+<link rel="stylesheet" type="text/css" href="http://cdn.datatables.net/1.10.21/css/jquery.dataTables.css">
+ 
+<!-- jQuery -->
+<script type="text/javascript" charset="utf8" src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+ 
+<!-- DataTables -->
+<script type="text/javascript" charset="utf8" src="http://cdn.datatables.net/1.10.21/js/jquery.dataTables.js"></script>
+
+<script src="https://d3js.org/d3.v4.js"></script>
+<script>
+var svg = d3.select("#force_graph"),
+    width = +svg.node().getBoundingClientRect().width,
+    height = +svg.node().getBoundingClientRect().height;
+
+
+
+// svg objects
+var link, node;
+// the data - an object with nodes and links
+var graph;
+
+// load the data
+d3.json("core.json", function(error, usersData) {
+    if (error) throw error;
+    nodes = usersData.nodes;
+    links = usersData.links;
+	for (i =0;i<links.length;i++){
+        links[i]['source']=links[i]["from"];
+        delete links[i]['from'];
+        links[i]['target']=links[i]["to"];
+        delete links[i]['to'];
+    }
+	graph = {};
+    graph.nodes = nodes;
+    graph.links = links;
+    //   var dataSet = graph.nodes.map(d=>d.values())
+    initializeDisplay();
+    initializeSimulation();
+});
+
+//////////// FORCE SIMULATION //////////// 
+
+// force simulator
+var simulation = d3.forceSimulation();
+
+// set up the simulation and event to update locations after each tick
+function initializeSimulation() {
+  simulation.nodes(graph.nodes);
+  initializeForces();
+  simulation.on("tick", ticked);
+}
+
+// values for all forces
+forceProperties = {
+    center: {
+        x: 0.5,
+        y: 0.5
+    },
+    charge: {
+        enabled: true,
+        strength: -30,
+        distanceMin: 1,
+        distanceMax: 200
+    },
+    collide: {
+        enabled: true,
+        strength: .7,
+        iterations: 1,
+        radius: 5
+    },
+    forceX: {
+        enabled: false,
+        strength: .1,
+        x: .5
+    },
+    forceY: {
+        enabled: false,
+        strength: .1,
+        y: .5
+    },
+    link: {
+        enabled: true,
+        distance: 30,
+        iterations: 1
+    }
+}
+
+const color=d3.scaleOrdinal(d3.schemeCategory10);
+colorMap= {
+			'Domain':1,
+			'IP':2,
+			'Cert':3,
+			'Whois_Phone':4,
+			'Whois_Name':5,
+			'ASN':6,
+			'Whois_Email':7,
+			'IP_C':8,
+		};
+
+
+// add forces to the simulation
+function initializeForces() {
+    // add forces and associate each with a name
+    simulation
+        .force("link", d3.forceLink())
+        .force("charge", d3.forceManyBody())
+        .force("collide", d3.forceCollide())
+        .force("center", d3.forceCenter())
+        .force("forceX", d3.forceX())
+        .force("forceY", d3.forceY());
+    // apply properties to each of the forces
+    updateForces();
+}
+
+
+
+// apply new force properties
+function updateForces() {
+    // get each force by name and update the properties
+    simulation.force("center")
+        .x(width * forceProperties.center.x)
+        .y(height * forceProperties.center.y);
+    simulation.force("charge")
+        .strength(forceProperties.charge.strength * forceProperties.charge.enabled)
+        .distanceMin(forceProperties.charge.distanceMin)
+        .distanceMax(forceProperties.charge.distanceMax);
+    simulation.force("collide")
+        .strength(forceProperties.collide.strength * forceProperties.collide.enabled)
+        .radius(forceProperties.collide.radius)
+        .iterations(forceProperties.collide.iterations);
+    simulation.force("forceX")
+        .strength(forceProperties.forceX.strength * forceProperties.forceX.enabled)
+        .x(width * forceProperties.forceX.x);
+    simulation.force("forceY")
+        .strength(forceProperties.forceY.strength * forceProperties.forceY.enabled)
+        .y(height * forceProperties.forceY.y);
+    simulation.force("link")
+        .id(function(d) {return d.id;})
+        .distance(forceProperties.link.distance)
+        .iterations(forceProperties.link.iterations)
+        .links(forceProperties.link.enabled ? graph.links : []);
+
+    // updates ignored until this is run
+    // restarts the simulation (important if simulation has already slowed down)
+    simulation.alpha(1).restart();
+}
+
+
+
+//////////// DISPLAY ////////////
+
+// generate the svg objects and force simulation
+function convexHulls(nodes) {
+            
+    let offset = 10; // 可以控制区域边界大小
+    let hulls = {};
+
+    for (let k=0; k<nodes.length; ++k) {
+        let n = nodes[k];
+        if (n.ip){
+        let i = n.ip, l = hulls[i] || (hulls[i] = []);
+
+        // l 记录了一个点的正方形区域的四个顶点
+        l.push([n.x-offset, n.y-offset]);
+        l.push([n.x-offset, n.y+offset]);
+        l.push([n.x+offset, n.y-offset]);
+        l.push([n.x+offset, n.y+offset]);
+        }
+    }
+    
+    // 创建凸壳集合
+    let hullset = [];
+    for (i in hulls) {
+        // d3.polygonHull可以求多边形最外层的点，返回的顺序是顺时针
+        hullset.push({ip: i, path: d3.polygonHull(hulls[i])});
+    }
+    return hullset;
+}
+
+// d3.line.curve()方法用于绘制一条曲线
+let curve = d3.line().curve(d3.curveCardinalClosed.tension(0.01));
+
+// 分类绘制凸壳
+function drawCluster(d) {
+    //返回曲线路径
+    return curve(d.path);
+}
+
+function initializeDisplay() {
+
+    let curve = d3.line().curve(d3.curveCardinalClosed.tension(0.01));
+
+
+    // set the data and properties of link lines
+    link = svg.append("g")
+        .selectAll("line")
+        .data(graph.links)
+        .enter().append("line")
+        .attr('stroke-width', 2)
+        .attr("stroke", "#999")
+        .attr("stroke-opacity", 0.6)
+        .on('mouseover', function (event,d) {
+				d3.select(this)
+					.style("stroke-width",3)
+          .style('stroke', 'red')})
+        .on('mouseout', function () {
+          d3.select(this)
+            .transition()
+            .duration(200)
+            .style("stroke-width",2)
+            .style('stroke', '#999')
+          });
+    link.append("title")
+    .text(function(d) { return 'Relation:'+d.relation; });
+  
+    // set the data and properties of node circles
+    // console.log(graph.nodes[0].industry)
+    node = svg.append("g")
+    .attr("stroke", "white")
+    .attr("stroke-width", 0.5)
+    .selectAll("circle")
+    .data(graph.nodes)
+    .attr("r", d=>{if (d.type==='Domain') return 1+0.5*d.industry.length; return 5})// 设置节点半径
+    .attr('fill', d=>color(colorMap[d.type]))
+    .enter().append("circle")
+    .call(d3.drag()
+    .on("start", dragstarted)
+    .on("drag", dragged)
+    .on("end", dragended))
+    .on('click', d=>{
+        setTab('one',3);detail(d);})
+    .on('mouseover', function (event,d) {
+                d3.select(this)
+        // .transition()
+        // .duration(200)
+    .style("r",d=>{if (d.type==='Domain') return 3+0.5*d.industry.length; return 7})
+    .style('stroke', 'black')})
+    .on('mouseout', function () {
+    d3.select(this)
+    .transition()
+    .duration(200)
+    .style("r",d=>{if (d.type==='Domain') return 1+0.5*d.industry.length; return 5})
+    .style('stroke', 'white')
+    // 		tooltip.transition()
+    // 			.duration(250)
+    // 			.style("opacity", 0);
+
+        });
+
+    // node tooltip
+    node.append("title")
+        .text(function(d) { return 'Name: '+d.name+'\nType: '+d.type+'\nIndustry: '+d.industry; });
+
+            		//定义凸壳组件
+    hulls = svg.append("g")
+        .selectAll("path.hull")
+        .data(convexHulls(nodes))
+        .enter()
+        .append("path")
+        .attr("class", "hull")
+        .attr("d", drawCluster);
+        // .style("fill", d=>color(d.group));
+
+
+    let legend = svg.append("g")
+    .attr("id", "legend");
+
+            // 定义图例中的色块（此处为圆形）
+    legend.selectAll("mydots")
+                .data(d3.range(1,9))
+                .enter()
+                .append("circle")
+                .attr("cx", 50)
+                .attr("cy", function(d,i){ 
+                    // 100是第一个点出现的地方，25是点之间的距离
+                    return 200 + i*25
+                }) 
+                .attr("r", 5)
+                .style("fill", function(d){ return color(d)})
+                .style("opacity",0.8);
+
+            // 在图例中添加一个文本标签
+    legend.selectAll("mylabels")
+                .data(Object.keys(colorMap))
+                .enter()
+                .append("text")
+                // .join("text")
+                .attr("x", 70)
+                .attr("y", function(d,i){ return 200 + i*25}) 
+                .style("fill", function(d,i){ return color(i+1)})
+                .style("opacity",0.8)
+                .text(function(d){ return "Type " + d})
+                .attr("text-anchor", "left")
+                .style("alignment-baseline", "middle")
+
+    
+    let lineList = svg.append("g")
+    .attr("id", "lineList");
+
+    ip_nodes = []
+    for (i =0;i<nodes.length;i++){
+        if (nodes[i]['type']==='IP'||nodes[i]['type']==='Cert'){
+            ip_nodes.push(nodes[i])
+        }
+    }
+
+    // cert_nodes = []
+    // for (i =0;i<nodes.length;i++){
+    //     if (nodes[i]['type']==='Cert'){
+    //         cert_nodes.push(nodes[i])
+    //     }
+    // }
+    
+    lineList.selectAll("focusTitle")
+    .data([1])
+    .enter()
+    .append("text")
+    .attr("x", 800)
+    .attr("y", 20) 
+    .style('font-weight', 450)
+    .text('核心资产')
+
+    chose = []
+
+    lineList.selectAll("focusList")
+    .data(ip_nodes)
+    .enter()
+    .append("text")
+    .attr('x',800)
+    .attr('fill','#888')
+    .attr('y',function(d,i){ return 42 + i*22})
+    .text(function(d){ return d.type+': ' + d.name})
+    .attr("text-anchor", "left")
+    .style("alignment-baseline", "middle")
+    .on("click",function(d){
+      if (chose.find(f=>f===d)!==d){
+        chose.push(d);
+        svg.selectAll('text')
+        .filter(function(f){return f===d})
+        .transition()
+        .duration(250)
+        .attr('fill','#000')
+        .attr("font-weight", 700)
+      }
+      else {
+        index = chose.indexOf(d);
+        if (index > -1) {
+          chose.splice(index, 1); 
+        }
+        svg.selectAll('text')
+        .filter(function(f){return f===d})
+        .transition()
+        .duration(250)
+        .attr('fill','#888')
+        .attr("font-weight", 500)
+
+        svg.selectAll('circle')
+        .filter(function(f) { 
+          return (f.type!==undefined)
+        })
+        .transition()
+        .duration(250)
+        .attr("stroke", 'white')
+        svg.selectAll('line')
+        .transition()
+        .duration(250)
+        .attr("stroke", '#999')
+      }
+      if (chose.length>=2){
+            svg.selectAll('circle')
+            .filter(function(f) { 
+              for (i=0;i<chose.length;i++){
+                if (f.ip === chose[i].id) return true;
+              }
+              return false;
+            })
+            .transition()
+            .duration(250)
+            .attr("stroke", 'red')
+            svg.selectAll('line')
+            .filter(function(f) { 
+            for (d=0;d<chose.length;d++){
+              for (i=0;i<graph.nodes.length;i++){
+                  if (graph.nodes[i].ip==chose[d].id){
+                      if (f.source===graph.nodes[i] || f.target===graph.nodes[i])
+                          return true;
+                  }
+              }
+            }
+            return false;
+            })
+            .transition()
+            .duration(250)
+            .attr("stroke", 'red')
+      }
+
+    })
+    // visualize the graph
+    updateDisplay();
+}
+
+// update the display based on the forces (but not positions)
+function updateDisplay() {
+    node
+        .attr("r", forceProperties.collide.radius)
+        .attr('fill', d=>color(colorMap[d.type]))
+        .attr("r", d=>{if (d.type==='Domain') return 1+0.5*d.industry.length; return 5})// 设置节点半径
+    link
+        .attr("opacity", forceProperties.link.enabled ? 1 : 0);
+}
+
+// update the display positions after each simulation tick
+function ticked() {
+    link
+        .attr("x1", function(d) { return d.source.x; })
+        .attr("y1", function(d) { return d.source.y; })
+        .attr("x2", function(d) { return d.target.x; })
+        .attr("y2", function(d) { return d.target.y; });
+
+    node
+        .attr("cx", function(d) { return d.x; })
+        .attr("cy", function(d) { return d.y; });
+    hulls
+        .data(convexHulls(graph.nodes))
+        .attr("d", drawCluster);
+    d3.select('#alpha_value').style('flex-basis', (simulation.alpha()*100) + '%');
+}
+
+//   label
+//     .filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
+//     .transition(transition)
+//       .style("fill-opacity", d => d.parent === focus ? 1 : 0)
+//       .on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
+//       .on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
+// }
+
+//////////// UI EVENTS ////////////
+
+function dragstarted(d) {
+  if (!d3.event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x;
+  d.fy = d.y;
+}
+
+function dragged(d) {
+  d.fx = d3.event.x;
+  d.fy = d3.event.y;
+}
+
+function dragended(d) {
+  if (!d3.event.active) simulation.alphaTarget(0);
+  d.fx = null;
+  d.fy = null;
+}
+
+// update size-related forces
+d3.select(window).on("resize", function(){
+    width = +svg.node().getBoundingClientRect().width;
+    height = +svg.node().getBoundingClientRect().height;
+    updateForces();
+});
+
+// convenience function to update everything (run after UI input)
+function updateAll() {
+    updateForces();
+    updateDisplay();
+}
+
+// ==============click and transition============
+var name='one';
+var curse1=1;
+var links_len,iInterId;
+
+function setTab(name,curse){
+  // console.log('SetTab')
+  links_len=4;
+  curse1=curse;
+  for(let i =0;i<links_len;i++){
+    var menu = document.getElementById(name+i);
+    var menudiv = document.getElementById("con"+i);
+
+    if(i==curse){
+      menu.className="off";
+      menudiv.style.display='flex';
+    }
+    else{
+      menu.className="";
+      menudiv.style.display="none";
+    }
+
+  }
+}
+function Next(){
+  curse1++;
+  if(curse1>links_len)curse1=1;
+  setTab(name,curse1);
+}
+
+onLoad = function(){
+  var links = document.getElementById('tab1').getElementsByTagName('li');
+  links_len=links.length;
+  for (let i=0;i<links_len;i++){
+    links[i].onmouseover=function(){
+      clearInterval(iInterId);
+    }
+  }
+  document.getElementById('con2').parentNode.onmouseover=function(){
+    clearInterval(iInterId);
+  }
+  setTab(name,curse1);
+}
+
+
+
+function detail(d){
+    const colorDetail=d3.scaleLinear()
+        .domain([0, 5])
+        .range(["hsl(152,80%,80%)", "hsl(228,30%,40%)"])
+        .interpolate(d3.interpolateHcl);
+
+    var svg_detail = d3.select("#detail")
+        .attr("viewBox", `-${width / 2} -${height / 2} ${width} ${height}`)
+        .style("display", "block")
+        .style("margin", "5px")
+        // .style("background", color(0))
+        .style("cursor", "pointer")
+        .on('click', d=>{setTab('one',0);});
+    
+
+    // 这一块要改成需要的
+
+
+  //   const data={name:'domain', children:[{name:'flare',children:[{name: 'AgglomerativeCluster', value: 3938},
+  //       {name: 'CommunityStructure', value: 3812},
+  //       {name: 'HierarchicalCluster', value: 6714},
+  //       {name: 'MergeEdge', value: 743}]}]}
+
+  //   pack = data => d3.pack()
+  //       .size([width, height])
+  //       .padding(10)
+  //   (d3.hierarchy(data)
+  //       .sum(d => d.value)
+  //       .sort((a, b) => b.value - a.value))
+
+  //   // pack成集合形式  必须！
+  //   var root = pack(data);
+  //   // console.log(root);
+
+  //   // const large_node = svg_detail.append('g')
+  //   //     .selectAll('circle')
+  //   //     .data(root)
+  //   //     .enter()
+  //   //     .append('circle')
+  //   //     .attr('fill',colorDetail(1))
+
+  //   // console.log(large_node)
+
+  //   const node_detail = svg_detail.append("g")
+  //       .selectAll("circle")
+  //       .data(root.descendants().slice(1))
+  //       .enter()
+  //       .append("circle")
+  //       .attr("fill", d => d.children ? color(d.depth) : "white")
+  //       .attr("pointer-events", null)
+  //       .on("mouseover", function() { d3.select(this).attr("stroke", "#000")
+  //    })
+  //       .on("mouseout", function() { d3.select(this).attr("stroke", null); });
+
+  //   const label = svg_detail.append("g")
+  //     .attr("pointer-events", "none")
+  //     .attr("text-anchor", "middle")
+
+
+  //   // const label = svg_detail.append("g").selectAll("mylabels")
+	// // 		.data(root.descendants().slice(1))
+	// // 		.enter()
+	// // 		.append("text")
+	// // 		// .join("text")
+
+	// // 		.style("fill", function(d,i){ return color(i+1)})
+	// // 		.style("opacity",0.8)
+	// // 		.text(function(d){ return "Type " + d})
+	// // 		.attr("text-anchor", "left")
+	// // 		.style("alignment-baseline", "middle")
+
+  //   zoomTo([root.x, root.y, root.r * 2]);
+
+
+  //   function zoomTo(v) {
+  //       const k = width / v[2]/2;
+
+  //       view = v;
+        
+  //       label.selectAll("text")
+  //       .data(root.descendants().slice(1))
+  //       .enter()
+  //       .append("text")
+  //     .attr("transform", d => {`translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`})
+  //   //   .attr("y", d=>d.y) 
+  //     .style("fill-opacity", 0.8)
+  //     .style("font-size",15)
+  //     .style("font-weight",d=>75+500*d.height)
+  //     .style("display", "inline")
+  //     .text(d => d.data.name);
+  //       // large_node.attr('transform',d=>{ console.log(d); return `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`})
+  //       // large_node.attr('r',d=>d.r)
+  //       // label.attr("transform", d => `translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`);
+  //       node_detail.attr("transform", d => {`translate(${(d.x - v[0]) * k},${(d.y - v[1]) * k})`});
+  //       node_detail.attr("r", d => d.r * k);
+  //   }
+
+
+}
+
+
+
+d3.json("core.json", function(error, usersData) {
+    if (error) throw error;
+    nodes = usersData.nodes;
+    var dataSet = nodes.map(d=>Object.values(d));
+    // console.log(dataSet);
+
+    $(document).ready(function() {
+        $('#example').DataTable( {
+            data: dataSet,
+            columns: [
+                { title: "ID" },
+                { title: "Name" },
+                { title: "Type" },
+                { title: "Industry" },
+                { title: "Group" },
+            ]
+        } );
+    } );
+});
+
+
+
+
+</script>
+
+</body>
+</html>
